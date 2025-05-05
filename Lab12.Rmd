@@ -1,0 +1,148 @@
+---
+title: "Lab12"
+author: "Bathsheba"
+date: "2025-04-14"
+output: pdf_document
+---
+
+***Lab 12**
+
+#Research question 1: Does rodent richness predict the density of Borrelia-infected ticks?
+
+#1. Import the data Let’s import the "tick.csv" dataset and explore it.
+
+```{r}
+library(glmmTMB)
+library(tidyverse)
+tick <- read.csv("tick.csv")
+##str(tick)
+```
+
+
+Questions:
+
+##How many observations and variables?
+There are 46 observations and 58 variables in the tick dataframe.
+
+##What type of variable is the response (DIN_Bbsl)?
+The response of DIN_Bbsl is in integers.
+
+#2. Fit a Poisson GLM
+
+
+# Fit GLM with Poisson family
+```{r}
+tick_glm <- glm(DIN_Bbsl ~ Rodent_Rich, family = "poisson", data = tick)
+summary(tick_glm)
+```
+
+#Stop, Think: Stop and consider: What is the coefficient for rodent richness, and what does it mean? Think about: Is it statistically significant?
+The coefficient for rodent richness is 0.48401. This means for each added rodent, the log of the tick count changes by 0.48401. Additionally, this relationship is statistically significant.
+
+```{r}
+# GLM output
+summary(tick_glm)
+```
+
+## 3. Plot your GLM predictions
+
+
+```{r}
+# Add model predictions to the dataset
+tick$predicted <- predict(tick_glm, type = "response")
+
+# Plot observed and predicted values
+ggplot(tick, aes(x = Rodent_Rich, y = DIN_Bbsl)) +
+  geom_point(alpha = 0.6) +
+  geom_line(aes(y = predicted), color = "red", size = 1) +
+  labs(
+    x = "Rodent richness",
+    y = "Density of infected nymphs (DIN_Bbsl)",
+    title = "Predicted vs. Observed: GLM for Infected Tick Density") +
+  theme_minimal()
+```
+
+#Challenge 1. Can you add something from your model output to improve this plot? Try using annotate() or geom_text() to display the model’s AIC or coefficient for rodent richness somewhere on the plot.
+
+```{r}
+# Get coefficient and AIC
+coef_val <- round(coef(tick_glm)["Rodent_Rich"], 3)
+aic_val <- round(AIC(tick_glm), 2)
+
+# Plot with annotations
+ggplot(tick, aes(x = Rodent_Rich, y = DIN_Bbsl)) +
+  geom_point(alpha = 0.6) +
+  geom_line(aes(y = predicted), color = "red", size = 1) +
+  annotate("text", x = min(tick$Rodent_Rich), y = max(tick$DIN_Bbsl), 
+           label = paste("Coef (Rodent_Rich):", coef_val), hjust = 0, size = 4) +
+  annotate("text", x = min(tick$Rodent_Rich), y = max(tick$DIN_Bbsl) - 1, 
+           label = paste("AIC:", aic_val), hjust = 0, size = 4) +
+  labs(
+    x = "Rodent richness",
+    y = "Density of infected nymphs (DIN_Bbsl)",
+    title = "GLM Predictions with Model Annotations"
+  ) +
+  theme_minimal()
+
+```
+
+
+#4. Plot model diagnostics
+
+```{r}
+# Diagnostic plots for GLM
+plot(tick_glm)
+```
+#What do you see in your plots? Can you spot any trends, outliers, or points that stand out?
+Residuals vs. Fitted: There is no obvious pattern, other than predicted values increasing slightly around 1.
+Normal Q-Q: I find that as the value increases, the points begin to slightly stray further from the line.
+Scale-Location: Variability does change, with the variability around 1.0 being slightly smaller than its counterparts but is fairly consistent between .05 to 2.0.
+Residuals vs. Leverage: Overall increased variablility around 0.05.
+
+#5. Add another predictor
+
+Stop, Think: Stop and consider the original research question and study design. Think about what other biological factors could influence tick infection density, and whether interactions among variables, like those you explored in two-way ANOVA, might reveal new insights.
+
+```{r}
+# Compare two GLMs with AIC
+tick_glm2 <- glm(DIN_Bbsl ~ Rodent_Rich + Predator_Shannon_wCat, family = "poisson", data = tick)
+AIC(tick_glm, tick_glm2)
+```
+
+##Questions:
+
+#Which model has the lower AIC?
+tick_glm2 has the lower AIC, so the addition of Predator_Shannon_wCat lowered AIC.
+#Does predator diversity add meaningful information?
+Predator diversity being added and lowering AIC tells us that both predator diversity and rodent richness may shape density of disease infected ticks.
+
+##Challenge 2. What if some unmeasured differences among sampling locations are influencing your results? Hint: Try including Site as a random effect using glmmTMB() to account for repeated measures and location-specific variation.
+Once you've fit the model, compare it to your previous GLM using AIC(). Does accounting for site improve model fit? Interpret your results.
+
+Site lowered the AIC, so site as a random effect improved the model fit and site along with predator diversity and rodent richness may shape density of disease infected ticks.
+
+```{r}
+tick_glm <- glm(DIN_Bbsl ~ Rodent_Rich + Site, family = "poisson", data = tick)
+summary(tick_glm)
+AIC(tick_glm2, tick_glm)
+```
+
+
+##Challenge 3. Fit a new model with both Site and Year as random effects. Then use AIC() to compare it with your previous model. Does including both grouping variables improve model fit? Hint: Use summary() and VarCorr() to help interpret your results.
+
+```{r}
+tick_glm <- glm(DIN_Bbsl ~ Rodent_Rich + Site + Year, family = "poisson", data = tick)
+summary(tick_glm)
+AIC(tick_glm2, tick_glm)
+```
+
+#Discussion questions:
+
+#What makes a GLM different from a linear model?
+A GLM allows for a model of a broader range of outcomes likes yes/no, or counts instead of just integers.
+
+#Why does a Poisson GLM use a log link function?
+The log link in a Poisson GLM makes sure that the model doesn't predict negative numbers.
+
+#What does AIC tell us when comparing two GLMs?
+When comparing 2 GLMs, AIC finds the model with the best fit with less assumptions. 
