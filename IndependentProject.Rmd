@@ -1,5 +1,5 @@
 ---
-title: "Independent Project 3"
+title: "Independent Project Final"
 author: "Bathsheba Aklilu"
 date: "2025-04-06"
 output: pdf_document
@@ -10,7 +10,7 @@ Breast cancer, like many other health issues, is characterized by inequitable su
 
 
 This analysis aims to investigate the relationship between CRP levels and social determinants of health among participants with history of breast cancer using the **NHANES 2021-2023 dataset**. We will focus on CRP as the dependent variable, exploring how social determinants of health such as income, education, and marital status impact inflammation.
-The National Health and Nutrition Examination Survey (NHANES) 2021-2023, includes detailed information on various health indicators, including CRP levels, income, and cancer history. We will examine CRP levels in relation to social determinants of health, including family income and poverty level, as well as demographic factors such as age and race/ethnicity. The primary statistical approaches utilized in this analysis include descriptive statistics, ANOVA, and regression modeling.
+The National Health and Nutrition Examination Survey (NHANES) 2021-2023, includes detailed information on various health indicators, including CRP levels, income, and cancer history. We will examine CRP levels in relation to social determinants of health, including family income and poverty level, as well as demographic factors such as age and race/ethnicity. The primary statistical approaches utilized in this analysis include descriptive statistics, ANOVA, GLM, and regression modeling.
 
 
 ## Research Question and Hypothesis
@@ -23,6 +23,7 @@ The National Health and Nutrition Examination Survey (NHANES) 2021-2023, include
 
 Aim 1: Determine the association between social determinants of health (income, education, and marital status) and C-reactive protein by race/ethnicity among women with history of breast cancer.
 
+
 ## Data Installation
 
 ```{r setup, echo=TRUE, message=FALSE, warning=FALSE}
@@ -32,14 +33,14 @@ library(tidyverse)
 library(haven)
 
 # loading data
-crp_data <- read_xpt("HSCRP_L.xpt")
-demo_data <- read_xpt("DEMO_L.xpt")
-income_data <- read_xpt("INQ_L.xpt")
-medical_data <- read_xpt("MCQ_L.xpt")
+crp_data <- read_xpt("data/HSCRP_L.xpt")
+demo_data <- read_xpt("data/DEMO_L.xpt")
+income_data <- read_xpt("data/INQ_L.xpt")
+medical_data <- read_xpt("data/MCQ_L.xpt")
 
 ```
 
-## Data Cleaning and Preparation
+## Data Cleaning and Preparation for Breast Cancer Survivors
 
 ```{r}
 # Clean and prepare CRP data (select necessary columns only)
@@ -116,18 +117,31 @@ cleaned_data_labeled <- merged_data %>%
 
 # Drop last nas if any
 
-cleaned_compiled_all <- cleaned_data_labeled %>%
+cleaned_compiled_allbc <- cleaned_data_labeled %>%
   drop_na()
 
-cleaned_compiled_all
+# Create SES category from INDFMPIR
+cleaned_compiled_allbc$SES <- cut(
+  cleaned_compiled_allbc$INDFMPIR,
+  breaks = c(-Inf, 1.30, 3.50, Inf),
+  labels = c("Low", "Moderate", "High")
+)
+
+
+
+cleaned_compiled_allbc
 
 ```
-##Data Visualization
+
+
+
+##Data Visualization (CRP and Race/Ethnicity)
 ```{r}
 # Loading Okabe-Ito palette (colorblind-friendly color palette)
 okabe_ito_colors <- palette.colors(palette = "Okabe-Ito")
 
-ggplot(cleaned_compiled_all, aes(x = RIDRETH3, y = LBXHSCRP, fill = RIDRETH3)) +
+# Participants with breast cancer
+ggplot(cleaned_compiled_allbc, aes(x = RIDRETH3, y = LBXHSCRP, fill = RIDRETH3)) +
   geom_boxplot() +
   geom_hline(yintercept = 3.0, linetype = "dashed", color = "red") +
   labs(
@@ -137,61 +151,223 @@ ggplot(cleaned_compiled_all, aes(x = RIDRETH3, y = LBXHSCRP, fill = RIDRETH3)) +
   ) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "none"
+  
   ) +
   scale_fill_manual(values = okabe_ito_colors)
 
 ```
 Figure 1: Boxplot depicting high-sensitivity c-reactive protein (CRP) levels (mg/L) in serum or plasma among participants with history of breast cancer stratified by race/ethnicity. C-reactive protein was collected by serum/plasma, not time-specific. Data collected through the CDC NHANES Research Program. Values above 3.0 mg/L suggest elevated cardiovascular or chronic inflammation risk and a dashed red line on the y-axis.
 
-## Statistical Analysis
-- **Shapiro-Wilk Test**: Identify the skew/normality of dataset
+Interpretation: While black, white, hispanic and multiracial groups have ranges above the 0.3 threshold for high inflammation, black women are the only group to have a median above the threshold. This graph and disparity between black women and white women only confirms what many other studies have often concluded in the past (Nazmi & Victora, 2007). Overall, women of color, and especially black women typically exhibit higher inflammation and cortisol levels. With data on stage at diagnosis, type of breast cancer, etc. we would be able to investigate the relationship of race to when participants were diagnosed and have a better
+
+##Data Visualization (CRP and Education Level)
 ```{r}
-# Run ANOVA
-crp_aov <- aov(LBXHSCRP ~ RIDRETH3, data = cleaned_compiled_all)
+##I want the groups on the x axis to go from least to highest education.
+cleaned_compiled_allbc$education_ranked <- factor(cleaned_compiled_allbc$DMDEDUC2, ordered = TRUE,
+  levels = c("Less than 9th grade",
+             "9–11th grade (Includes 12th grade with no diploma)",
+             "High school graduate/GED or equivalent",
+             "Some college or AA degree",
+             "College graduate or above"))
 
-# Get residuals
-crp_res <- residuals(crp_aov)
+# Participants with breast cancer
+ggplot(cleaned_compiled_allbc, aes(x = education_ranked, y = LBXHSCRP, fill = education_ranked)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 3.0, linetype = "dashed", color = "red") +
+  labs(
+    x = "Education Level",
+    y = "High-Sensitivity CRP (mg/L)",
+    title = "C-Reactive Protein Levels of Breast Cancer Survivors by Education Level"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  ) 
 
-# Shapiro-Wilk test
-shapiro.test(crp_res)
 
-#Because there are less than 2 observations in a few groups, I will filter them out in order to run bartlett 
-filtered_data <- cleaned_compiled_all %>%
+```
+Figure 2: Boxplot depicting high-sensitivity c-reactive protein (CRP) levels (mg/L) in serum or plasma among participants with no history of breast cancer stratified by education level. Education level data was collected through survey. C-reactive protein was collected by serum/plasma, not time-specific. Data collected through the CDC NHANES Research Program. Values above 3.0 mg/L suggest elevated cardiovascular or chronic inflammation risk and a dashed red line on the y-axis.
+
+Interpretation: Participants with high school or less than 9th grade education are the only groups to have a median above the threshold. This graph and disparity could be influenced by the jobs that participants are able to obtain and their exposure to inflammation-causing materials. Additonally this could be influenced by access to healthcare/quality of healthcare these jobs afford.
+
+##Data Visualization (CRP and Marital Status)
+```{r}
+# Participants with breast cancer
+ggplot(cleaned_compiled_allbc, aes(x = DMDMARTZ, y = LBXHSCRP, fill = DMDMARTZ)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 3.0, linetype = "dashed", color = "red") +
+  labs(
+    x = "Marital Status",
+    y = "High-Sensitivity CRP (mg/L)",
+    title = "C-Reactive Protein Levels of Breast Cancer Survivors by Marital Status"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  ) 
+
+
+```
+Figure 3: Boxplot depicting high-sensitivity c-reactive protein (CRP) levels (mg/L) in serum or plasma among participants with no history of breast cancer stratified by marital status. Marital status data was collected through survey. C-reactive protein was collected by serum/plasma, not time-specific. Data collected through the CDC NHANES Research Program. Values above 3.0 mg/L suggest elevated cardiovascular or chronic inflammation risk and a dashed red line on the y-axis.
+
+Interpretation: Interestingly, while all groups range over the threshold, no groups had a median above the threshold. However, the widowed/divorced/separated group has the highest range. The lack of disparity could be due to the small sample size, or simply no association between marital status and inflammation. I would like to test social support in the future as that may be the primary factor involved here.
+
+##CRP and Income-to-Poverty Ratio (recoded into SES level based on HHS standards)
+```{r}
+# Participants with breast cancer
+ggplot(cleaned_compiled_allbc, aes(x = SES, y = LBXHSCRP, fill = SES)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 3.0, linetype = "dashed", color = "red") +
+  labs(
+    x = "Socioeconomic Status (recoded from Income-to-Poverty Ratio)",
+    y = "High-Sensitivity CRP (mg/L)",
+    title = "C-Reactive Protein Levels of Breast Cancer Survivors by Socioeconomic Status"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  ) 
+
+```
+Figure 4: Boxplot depicting high-sensitivity c-reactive protein (CRP) levels (mg/L) in serum or plasma among participants with no history of breast cancer stratified by Socioeconomic Status. Socioeconomic status data was dervied from Income-to-Poverty Ratio based of Health and Human Services standards. C-reactive protein was collected by serum/plasma, not time-specific. Data collected through the CDC NHANES Research Program. Values above 3.0 mg/L suggest elevated cardiovascular or chronic inflammation risk and a dashed red line on the y-axis.
+
+Interpretation: Interestingly, while all groups range over the threshold, moderate SES was the only group above the threshold. This could be due to the way the groups were categorized. Participants in the low socioeconomic status group qualified for government assistance, and health insurance, while the moderate and high groups did not. The government assistance with Health insurance could be providing participants with low SES access to healthcare that the moderate group may not have, or have insufficiently.
+
+## Data transformation and statistical analysis: Shapiro-Wilks, Bartlett, ANOVA(Tukeys)
+```{r}
+#Because the data is naturally not normal, and CRP is normally right skewed, I transformed CRP data by using log.
+
+cleaned_compiled_allbc$log_CRP <- log(cleaned_compiled_allbc$LBXHSCRP + 0.01)
+crp_log_aov <- aov(log_CRP ~ DMDEDUC2 + RIDRETH3, data = cleaned_compiled_allbc)
+
+# CRP and Race/Ethnicity
+# Shapiro test on residuals, ensuring over 2 participants per group
+shapiro.test(residuals(crp_log_aov))
+df_filtered <- cleaned_compiled_allbc %>%
   group_by(RIDRETH3) %>%
   filter(n() >= 2) %>%
   ungroup()
 
-# Bartlett's test for homogeneity of variances
-bartlett.test(LBXHSCRP ~ RIDRETH3, data = filtered_data)
-```
+# Bartlett’s test for equal variances
+bartlett.test(log_CRP ~ RIDRETH3, data = df_filtered)
 
+TukeyHSD(crp_log_aov)
+
+crp_log_aov <- aov(log_CRP ~ RIDRETH3, data = cleaned_compiled_allbc)
+
+##CRP and education
+# Shapiro test on residuals, ensuring over 2 participants per group
+shapiro.test(residuals(crp_log_aov))
+df_filtered <- cleaned_compiled_allbc %>%
+  group_by(DMDEDUC2) %>%
+  filter(n() >= 2) %>%
+  ungroup()
+
+# Bartlett’s test for equal variances
+bartlett.test(log_CRP ~ DMDEDUC2, data = df_filtered)
+
+TukeyHSD(crp_log_aov)
+
+crp_log_aov <- aov(log_CRP ~ DMDEDUC2, data = cleaned_compiled_allbc)
+
+#CRP and marital status
+# Shapiro test on residuals
+shapiro.test(residuals(crp_log_aov))
+df_filtered <- cleaned_compiled_allbc %>%
+  group_by(DMDMARTZ) %>%
+  filter(n() >= 2) %>%
+  ungroup()
+
+# Bartlett’s test for equal variances
+bartlett.test(log_CRP ~ DMDMARTZ, data = df_filtered)
+
+TukeyHSD(crp_log_aov)
+
+crp_log_aov <- aov(log_CRP ~ SES, data = cleaned_compiled_allbc)
+
+#CRP and SES
+# Shapiro test on residuals
+shapiro.test(residuals(crp_log_aov))
+df_filtered <- cleaned_compiled_allbc %>%
+  group_by(SES) %>%
+  filter(n() >= 2) %>%
+  ungroup()
+
+# Bartlett’s test for equal variances
+bartlett.test(log_CRP ~ SES, data = df_filtered)
+
+TukeyHSD(crp_log_aov)
+
+crp_log_aov <- aov(log_CRP ~ RIDRETH3, data = cleaned_compiled_allbc)
+
+```
 Shapiro test an batrlett both indicate not-normal distribution.
 
-- **Kruskal-Wallis Test**: We cannot run ANOVA because many groups violate normality.
+
+## Statistical Analysis Continued
+
+- **Kruskal-Wallis Test**: Traditionally, we cannot run ANOVA because many groups violate normality (which is why I transformed the data).
 ```{r}
 # Kruskal-Wallis for Education
-kruskal.test(LBXHSCRP ~ DMDEDUC2, data = cleaned_compiled_all)
+kruskal.test(LBXHSCRP ~ DMDEDUC2, data = cleaned_compiled_allbc)
 
 # Kruskal-Wallis for Marital status
-kruskal.test(LBXHSCRP ~ DMDMARTZ, data = cleaned_compiled_all)
+kruskal.test(LBXHSCRP ~ DMDMARTZ, data = cleaned_compiled_allbc)
+
+# Kruskal-Wallis for SES
+kruskal.test(LBXHSCRP ~ SES, data = cleaned_compiled_allbc)
 
 # Kruskal-Wallis for Race/Ethnicity
-kruskal.test(LBXHSCRP ~ RIDRETH3, data = cleaned_compiled_all)
+kruskal.test(LBXHSCRP ~ RIDRETH3, data = cleaned_compiled_allbc)
 
 ```
 
 - **Spearman's**: Due to lack of normal distribution, we are no longer using pearsons, and instead using spearmans.
 ```{r} 
 
-# Correlation between CRP and family poverty index
-cor.test(cleaned_compiled_all$LBXHSCRP, cleaned_compiled_all$INDFMMPI, method = "spearman")
-
 # Correlation between CRP and income-to-poverty ratio
-cor.test(cleaned_compiled_all$LBXHSCRP, cleaned_compiled_all$INDFMPIR, method = "spearman")
+cor.test(cleaned_compiled_allbc$LBXHSCRP, cleaned_compiled_allbc$INDFMPIR, method = "spearman")
+
+# Correlation between CRP and Education (by ranking education first)
+cleaned_compiled_allbc$education_ranked <- factor(cleaned_compiled_allbc$DMDEDUC2, ordered = TRUE,
+  levels = c("Less than 9th grade",
+             "9–11th grade (includes 12th grade with no diploma)",
+             "High school graduate/GED or equivalent",
+             "Some college or AA degree",
+             "College graduate or above"))
+
+cor.test(as.numeric(cleaned_compiled_allbc$education_ranked), cleaned_compiled_allbc$LBXHSCRP, method = "spearman")
+```
+
+## Cross Referencing with GLM
+```{r}
+glm_crp <- glm(log_CRP ~ DMDEDUC2 + DMDMARTZ + SES + RIDRETH3,
+               data = cleaned_compiled_allbc, family = gaussian())
+glm_gamma_crp1 <- glm(LBXHSCRP ~ DMDEDUC2,
+                     data = cleaned_compiled_allbc,
+                     family = Gamma(link = "log"))
+glm_gamma_crp2 <- glm(LBXHSCRP ~ DMDMARTZ,
+                     data = cleaned_compiled_allbc,
+                     family = Gamma(link = "log"))
+glm_gamma_crp3 <- glm(LBXHSCRP ~ SES,
+                     data = cleaned_compiled_allbc,
+                     family = Gamma(link = "log"))
+glm_gamma_crp4 <- glm(LBXHSCRP ~ RIDRETH3,
+                     data = cleaned_compiled_allbc,
+                     family = Gamma(link = "log"))
+
+summary(glm_crp)
+summary(glm_gamma_crp1)
+summary(glm_gamma_crp2)
+summary(glm_gamma_crp3)
+summary(glm_gamma_crp4)
 
 ```
 
+
+Conclusion: 
+
+While there is variation in C-reactive protein levels of breast cancer survivors in terms of whether or not CRP was above normal levels, no comparison had a statistically significant correlation except for CRP and SES between the moderate and high socioeconomic status. This could be due to the fact that one of the factors used to categorize SES is eligibility for government assisted programs like EBT and healthcare. With participants that were moderate, they did not have access to healthcare through the government. This could be a driving factor as access to healthcare has been shown to have significant associations with poor cancer outcomes, which could be contributing to inflammation in the body. Overall, we hope this research can be used to inform public policymakers on the associations of SDOH and inflammation.
 
 References:
 
@@ -234,8 +410,6 @@ al. Age-specific breast cancer risk by body mass index and familial risk: prospe
 
 Islami, F., Ward, E. M., Sung, H., Cronin, K. A., Tangka, F. K. L., Sherman, R. L., Zhao, J., Anderson, R. N., Henley, S. J., Yabroff, K. R., Jemal, A., & Benard, V. B. (2021). Annual Report to the Nation on the Status of Cancer, Part 1: National Cancer Statistics. JNCI: Journal of the National Cancer Institute, 113(12),
 1648–1669. https://doi.org/10.1093/jnci/djab131 
-
-
 
 
 PMC7048405. Mikkelsen, M. K., Lindblom, N. A. F., Dyhl-Polk, A., Juhl, C. B., Johansen, J. S., & Nielsen, D. (2022). Systematic review and meta-analysis of C-reactive protein as a biomarker in breast cancer. Critical 3
